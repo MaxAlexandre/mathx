@@ -12,7 +12,7 @@ class MainController extends Controller
         return view('home');
     }
 
-    public function generateExercises(Request $request) : View
+    public function generateExercises(Request $request): View
     {
         //form validation
 
@@ -53,51 +53,12 @@ class MainController extends Controller
         $exercises = [];
         for ($index = 1; $index <= $numberExercises; $index++) {
 
-            $operation = $operations[array_rand($operations)];
-            $number1 = rand($min, $max);
-            $number2 = rand($min, $max);
-
-            $exercise = '';
-            $sollution = '';
-
-            switch ($operation) {
-                case 'sum':
-                    $exercise = "$number1 + $number2 =";
-                    $sollution = $number1 + $number2;
-                    break;
-                case 'subtraction':
-                    $exercise = "$number1 - $number2 =";
-                    $sollution = $number1 - $number2;
-                case 'multiplication':
-                    $exercise = "$number1 x $number2 =";
-                    $sollution = $number1 * $number2;
-                    break;
-                case 'division':
-
-                    // avoid division by zero
-                    if ($number2 == 0) {
-                        $number2 = 1;
-                    }
-
-                    $exercise = "$number1 : $number2 =";
-                    $sollution = $number1 / $number2;
-                    break;
-
-            }
-
-            //if $sollution is a float number, round it to 2 decimal places
-            if (is_float($sollution)) {
-                $sollution = round($sollution, 2);
-            }
-
-            $exercises[] = [
-                'operation' => $operation,
-                'exercise_number' => $index,
-                'exercise' => $exercise,
-                'sollution' => "$exercise $sollution"
-            ];
+            $exercises[] = $this->generateExercise($index, $operations, $min, $max);
 
         }
+
+        //place exercises in session
+        session(['exercises' => $exercises]);
 
         return view('operations', ['exercises' => $exercises]);
 
@@ -106,11 +67,102 @@ class MainController extends Controller
 
     public function printExercises()
     {
-        echo 'Imprimir exercícios no navegador';
+        // check if exercises are in session
+        if (!session()->has('exercises')) {
+            return redirect()->route('home');
+        }
+
+        $exercises = session('exercises');
+
+        echo '<pre>';
+        echo '<h1>Exercícios de Matemática (' . env('APP_NAME') . ')</h1>';
+        echo '<hr>';
+
+        foreach ($exercises as $exercise) {
+            echo '<h2><small>' . $exercise['exercise_number'] . '</small>| ' . $exercise['exercise'] . '</h2>';
+        }
+
+        // sollutions
+        echo '<hr>';
+        echo '<small>Soluções</small><br>';
+        foreach ($exercises as $exercise) {
+            echo '<small>' . $exercise['exercise_number'] . ' | ' . $exercise['sollution'] . '</small><br>';
+        }
+
     }
 
     public function exportExercises()
     {
-        echo 'exportar exercícios para um arquivo de texto';
+        // check if exercises are in session
+        if (!session()->has('exercises')) {
+            return redirect()->route('home');
+        }
+
+        $exercises = session('exercises');
+
+        //create file to download with exercises
+        $filename = 'exercises_' . env('APP_NAME') . '_' . date('YmdHis') . '.txt';
+        $content = 'Exercícios de Matemática (' . env('APP_NAME') . ')' . "\n\n";
+        foreach ($exercises as $exercise) {
+            $content .= $exercise['exercise_number'] . ' > ' . $exercise['exercise'] . "\n";
+        }
+
+        //sollutions
+        $content .= "\n";
+        $content .= "Soluções\n" . str_repeat('-', 20) . "\n";
+        foreach ($exercises as $exercise) {
+            $content .= $exercise['exercise_number'] . ' > ' . $exercise['sollution'] . "\n";
+        }
+
+        return response($content)
+            ->header('Content-Type', 'text/plain')
+            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+    }
+
+    private function generateExercise($index, $operations, $min, $max): array
+    {
+        $operation = $operations[array_rand($operations)];
+        $number1 = rand($min, $max);
+        $number2 = rand($min, $max);
+
+        $exercise = '';
+        $sollution = '';
+
+        switch ($operation) {
+            case 'sum':
+                $exercise = "$number1 + $number2 =";
+                $sollution = $number1 + $number2;
+                break;
+            case 'subtraction':
+                $exercise = "$number1 - $number2 =";
+                $sollution = $number1 - $number2;
+            case 'multiplication':
+                $exercise = "$number1 x $number2 =";
+                $sollution = $number1 * $number2;
+                break;
+            case 'division':
+
+                // avoid division by zero
+                if ($number2 == 0) {
+                    $number2 = 1;
+                }
+
+                $exercise = "$number1 : $number2 =";
+                $sollution = $number1 / $number2;
+                break;
+
+        }
+
+        //if $sollution is a float number, round it to 2 decimal places
+        if (is_float($sollution)) {
+            $sollution = round($sollution, 2);
+        }
+
+        return [
+            'operation' => $operation,
+            'exercise_number' => str_pad($index, 2, '0', STR_PAD_LEFT),
+            'exercise' => $exercise,
+            'sollution' => "$exercise $sollution"
+        ];
     }
 }
